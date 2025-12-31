@@ -17,21 +17,48 @@ const transports = {};
 let sfConnection = null;
 
 async function connectToSalesforce() {
+  // Option 1: Refresh Token Flow (recommended for Okta SSO)
+  if (process.env.SALESFORCE_REFRESH_TOKEN) {
+    const oauth2 = new jsforce.OAuth2({
+      clientId: process.env.SALESFORCE_CLIENT_ID,
+      clientSecret: process.env.SALESFORCE_CLIENT_SECRET,
+      redirectUri: process.env.SALESFORCE_CALLBACK_URL || 'https://login.salesforce.com/services/oauth2/success'
+    });
+
+    const conn = new jsforce.Connection({
+      oauth2: oauth2,
+      instanceUrl: process.env.SALESFORCE_INSTANCE_URL,
+      refreshToken: process.env.SALESFORCE_REFRESH_TOKEN,
+      version: '59.0'
+    });
+
+    // Force a token refresh to validate connection
+    await conn.identity();
+    console.log('Connected to Salesforce via refresh token');
+    return conn;
+  }
+
+  // Option 2: Direct Access Token
+  if (process.env.SALESFORCE_ACCESS_TOKEN) {
+    const conn = new jsforce.Connection({
+      instanceUrl: process.env.SALESFORCE_INSTANCE_URL,
+      accessToken: process.env.SALESFORCE_ACCESS_TOKEN,
+      version: '59.0'
+    });
+    console.log('Connected to Salesforce via access token');
+    return conn;
+  }
+
+  // Option 3: Username/Password (fallback, won't work with Okta SSO)
   const conn = new jsforce.Connection({
     instanceUrl: process.env.SALESFORCE_INSTANCE_URL,
     version: '59.0'
   });
-
-  if (process.env.SALESFORCE_ACCESS_TOKEN) {
-    conn.accessToken = process.env.SALESFORCE_ACCESS_TOKEN;
-  } else {
-    // OAuth 2.0 Client Credentials flow
-    await conn.login(
-      process.env.SALESFORCE_USERNAME,
-      process.env.SALESFORCE_PASSWORD + process.env.SALESFORCE_SECURITY_TOKEN
-    );
-  }
-
+  await conn.login(
+    process.env.SALESFORCE_USERNAME,
+    process.env.SALESFORCE_PASSWORD + process.env.SALESFORCE_SECURITY_TOKEN
+  );
+  console.log('Connected to Salesforce via username/password');
   return conn;
 }
 
