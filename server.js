@@ -19,11 +19,20 @@ let sfConnection = null;
 async function connectToSalesforce() {
   // Option 1: Refresh Token Flow (recommended for Okta SSO)
   if (process.env.SALESFORCE_REFRESH_TOKEN) {
-    const oauth2 = new jsforce.OAuth2({
-      clientId: process.env.SALESFORCE_CLIENT_ID,
-      clientSecret: process.env.SALESFORCE_CLIENT_SECRET,
+    // Use Salesforce CLI's default Connected App if no client ID provided
+    const clientId = process.env.SALESFORCE_CLIENT_ID || 'PlatformCLI';
+
+    const oauth2Config = {
+      clientId: clientId,
       redirectUri: process.env.SALESFORCE_CALLBACK_URL || 'https://login.salesforce.com/services/oauth2/success'
-    });
+    };
+
+    // Only add client secret if provided (not needed for PlatformCLI)
+    if (process.env.SALESFORCE_CLIENT_SECRET) {
+      oauth2Config.clientSecret = process.env.SALESFORCE_CLIENT_SECRET;
+    }
+
+    const oauth2 = new jsforce.OAuth2(oauth2Config);
 
     const conn = new jsforce.Connection({
       oauth2: oauth2,
