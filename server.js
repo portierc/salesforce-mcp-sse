@@ -10,6 +10,28 @@ import {
 const app = express();
 app.use(express.json());
 
+// API Key Authentication Middleware
+const API_KEY = process.env.MCP_API_KEY;
+
+function authenticateRequest(req, res, next) {
+  // Skip auth if no API key is configured
+  if (!API_KEY) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  const queryKey = req.query.api_key;
+
+  // Check Bearer token or query param
+  const providedKey = authHeader?.replace('Bearer ', '') || queryKey;
+
+  if (providedKey !== API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized - Invalid or missing API key' });
+  }
+
+  next();
+}
+
 // Store active transports
 const transports = {};
 
@@ -202,8 +224,8 @@ function createMcpServer() {
   return server;
 }
 
-// SSE endpoint
-app.get('/sse', async (req, res) => {
+// SSE endpoint (protected)
+app.get('/sse', authenticateRequest, async (req, res) => {
   console.log('New SSE connection');
 
   const transport = new SSEServerTransport('/messages', res);
@@ -218,8 +240,8 @@ app.get('/sse', async (req, res) => {
   await server.connect(transport);
 });
 
-// Messages endpoint
-app.post('/messages', async (req, res) => {
+// Messages endpoint (protected)
+app.post('/messages', authenticateRequest, async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports[sessionId];
 
